@@ -15,7 +15,17 @@ export const blogRouter = new Hono<{
 }>();
 
 blogRouter.use('/*', async(c, next)=>{
+    const path = c.req.path;
+    const method = c.req.method;
 
+    console.log(path, method);
+
+    const uuidRegex = /^\/api\/v1\/blog\/[0-9a-fA-F\-]{36}$/;
+
+    if ((path === '/api/v1/blog/bulk' && method === 'GET') || (uuidRegex.test(path) && method === 'GET')) {
+        await next();
+        return;
+    }
     const jwt = c.req.header("Authorization")|| ""
     if(!jwt){
         return c.json({
@@ -23,6 +33,7 @@ blogRouter.use('/*', async(c, next)=>{
         })
     }
     const token = jwt.split(" ")[1];
+    console.log(token);
     const payload = await verify(token, c.env.JWT_SECRET)
     if(!payload.id){
         c.status(401)
@@ -136,7 +147,18 @@ blogRouter.get("/bulk", async(c) => {
       }).$extends(withAccelerate());
 
       try {
-        const posts = await prisma.post.findMany({});
+        const posts = await prisma.post.findMany({
+            select:{
+                content: true,
+                title: true,
+                id: true,
+                author: {
+                    select:{
+                        email: true
+                    }
+                }
+            }
+        });
 
         return c.json({
             posts
@@ -160,6 +182,16 @@ blogRouter.get("/:id", async(c) => {
         const post = await prisma.post.findUnique({
             where:{
                 id
+            },
+            select:{
+                content: true,
+                title: true,
+                id: true,
+                author: {
+                    select:{
+                        email: true
+                    }
+                }
             }
         })
         return c.json({
